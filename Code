@@ -1,0 +1,71 @@
+#define BLYNK_TEMPLATE_ID "TMPL3ssIcLB35"
+#define BLYNK_TEMPLATE_NAME "esp32222"
+#define BLYNK_AUTH_TOKEN "F7TH206mQckf9_UX_92sVSvVpBGyvhKu"
+
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+
+char auth[] = BLYNK_AUTH_TOKEN;
+char ssid[] = "Khushwant";
+char pass[] = "7588731861";
+
+#define SOIL_MOISTURE_PIN 34
+#define RELAY_PIN 18
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("Starting ESP32 Plant Watering Project...");
+
+  analogSetAttenuation(ADC_11db);  // Extend ADC range
+
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, HIGH);  // Relay OFF initially
+
+  WiFi.begin(ssid, pass);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\n✅ WiFi Connected");
+  Serial.println("IP Address: " + WiFi.localIP().toString());
+
+  Blynk.config(auth);
+  if (Blynk.connect(10000)) {
+    Serial.println("✅ Blynk Connected");
+  } else {
+    Serial.println("❌ Blynk Connection Failed");
+  }
+}
+
+void loop() {
+  Blynk.run();
+
+  int moistureRaw = analogRead(SOIL_MOISTURE_PIN);
+  Serial.print("Raw Moisture: ");
+  Serial.println(moistureRaw);
+
+  // Map raw ADC value to percentage (0% dry, 100% wet)
+  int moisturePercent = map(moistureRaw, 4095, 0, 0, 100);
+  moisturePercent = constrain(moisturePercent, 0, 100); // Clamp values between 0-100
+
+  Serial.print("Moisture %: ");
+  Serial.println(moisturePercent);
+
+  // Send moisture % to Blynk Gauge widget on V0
+  Blynk.virtualWrite(V0, moisturePercent);
+
+  // Watering control threshold (adjust if needed)
+  if (moisturePercent < 30) {   // If soil is less than 30% moist → water it
+    digitalWrite(RELAY_PIN, LOW);  // Relay ON (pump ON)
+    Blynk.virtualWrite(V1, "Watering 🌧️");
+    Serial.println("💧 Soil dry - Pump ON");
+  } else {
+    digitalWrite(RELAY_PIN, HIGH); // Relay OFF (pump OFF)
+    Blynk.virtualWrite(V1, "Soil OK ✅");
+    Serial.println("✅ Soil moisture OK - Pump OFF");
+  }
+
+  delay(2000);
+}
